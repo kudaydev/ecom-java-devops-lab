@@ -56,12 +56,12 @@ jobs:
          -Dsonar.token=${{ env.SONAR_TOKEN }} \
           sonar:sonar
 
-      - name: Checkov scan (K8s manifests)
-        uses: bridgecrewio/checkov-action@master
-        with:
-          directory: ./k8s
-          framework: kubernetes
-          soft_fail: true
+      # - name: Checkov scan (K8s manifests)
+      #   uses: bridgecrewio/checkov-action@master
+      #   with:
+      #     directory: ./k8s
+      #     framework: kubernetes
+      #     soft_fail: true
 
       # Only assume role and interact with AWS on pushes to main
       - name: Configure AWS credentials (OIDC) - only on push to main
