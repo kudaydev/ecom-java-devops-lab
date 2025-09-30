@@ -1,113 +1,117 @@
-# name: CI-Build-Scan
+name: CI-Build-Scan
 
-# on:
-#   push:
-#     branches: [ main ]
-#   pull_request:
-#     branches: [ main ]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-# permissions:
-#   id-token: write   # for OIDC
-#   contents: read
+permissions:
+  id-token: write   # for OIDC (push to main only)
+  contents: read
 
-# env:
-#   AWS_REGION: ${{ secrets.AWS_REGION }}
-#   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-#   ECR_REPO: ${{ secrets.ECR_REPO }}
-#   DOCKER_IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}
-#   IMAGE_TAG: ${{ github.sha }}
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REPO: ${{ secrets.ECR_REPO }}
+  DOCKER_IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}
+  IMAGE_TAG: ${{ github.sha }}
 
-# jobs:
-#   build-test-scan:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
+jobs:
+  build-test-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-#       - name: Set up JDK 17
-#         uses: actions/setup-java@v4
-#         with:
-#           distribution: 'temurin'
-#           java-version: '17'
-#           cache: 'maven'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
 
-#       - name: Build & test (Maven)
-#         run: mvn -B -ntp clean verify
+      - name: Build & test (Maven)
+        run: mvn -B -ntp clean verify
 
-#       - name: Upload unit test reports
-#         uses: actions/upload-artifact@v4
-#         if: always()
-#         with:
-#           name: surefire-reports
-#           path: target/surefire-reports/**/*
+      - name: Upload unit test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/**/*
 
-#       - name: SonarCloud Scan (optional)
-#         if: ${{ secrets.SONAR_TOKEN != '' }}
-#         uses: SonarSource/sonarcloud-github-action@v2
-#         env:
-#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-#         with:
-#           projectBaseDir: .
+      - name: SonarCloud Scan (optional)
+        if: ${{ secrets.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarcloud-github-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectBaseDir: .
 
-#       - name: Checkov scan (K8s manifests)
-#         uses: bridgecrewio/checkov-action@v12
-#         with:
-#           directory: k8s
-#           framework: kubernetes
-#           soft_fail: false
+      - name: Checkov scan (K8s manifests)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: k8s
+          framework: kubernetes
+          soft_fail: false
 
-#       - name: Configure AWS credentials (OIDC)
-#         uses: aws-actions/configure-aws-credentials@v4
-#         with:
-#           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-#           aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials (OIDC) - only on push to main
+        if: ${{ github.event_name == 'push' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-#       - name: Login to Amazon ECR
-#         id: login-ecr
-#         uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR - only on push to main
+        if: ${{ github.event_name == 'push' }}
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-#       - name: Build Docker image
-#         run: |
-#           docker build -t $DOCKER_IMAGE:$IMAGE_TAG -t $DOCKER_IMAGE:latest .
+      - name: Build Docker image
+        run: |
+          docker build -t $DOCKER_IMAGE:$IMAGE_TAG -t $DOCKER_IMAGE:latest .
 
-#       - name: Trivy image scan (fail on CRITICAL)
-#         uses: aquasecurity/trivy-action@0.24.0
-#         with:
-#           image-ref: ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
-#           format: 'table'
-#           vuln-type: 'os,library'
-#           severity: 'CRITICAL'
-#           ignore-unfixed: true
-#           exit-code: '1'
+      - name: Trivy image scan (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+          format: 'table'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
 
-#       - name: Push to ECR
-#         run: |
-#           docker push $DOCKER_IMAGE:$IMAGE_TAG
-#           docker push $DOCKER_IMAGE:latest
+      - name: Push to ECR - only on push to main
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          docker push $DOCKER_IMAGE:$IMAGE_TAG
+          docker push $DOCKER_IMAGE:latest
 
-#       - name: Slack notify (success)
-#         if: success() && env.SLACK_WEBHOOK_URL != null
-#         uses: rtCamp/action-slack-notify@v2
-#         env:
-#           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-#           SLACK_COLOR: good
-#           SLACK_MESSAGE: |
-#             ✅ CI passed for ${{ github.repository }}@${{ github.sha }}
-#             Image: ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+      - name: Slack notify (success)
+        if: success() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_COLOR: good
+          SLACK_MESSAGE: |
+            ✅ CI passed for ${{ github.repository }}@${{ github.sha }}
+            Image: ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+            Event: ${{ github.event_name }}
 
-#     # Failure notification
-#     timeout-minutes: 30
-
-#   notify-on-failure:
-#     needs: [build-test-scan]
-#     runs-on: ubuntu-latest
-#     if: failure()
-#     steps:
-#       - name: Slack notify (failure)
-#         if: env.SLACK_WEBHOOK_URL != null
-#         uses: rtCamp/action-slack-notify@v2
-#         env:
-#           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-#           SLACK_COLOR: danger
-#           SLACK_MESSAGE: |
-#             ❌ CI failed for ${{ github.repository }}@${{ github.sha }}
+  notify-on-failure:
+    needs: [build-test-scan]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Slack notify (failure)
+        if: secrets.SLACK_WEBHOOK_URL != ''
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_COLOR: danger
+          SLACK_MESSAGE: |
+            ❌ CI failed for ${{ github.repository }}@${{ github.sha }}
+            Event: ${{ github.event_name }}

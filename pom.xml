@@ -3,6 +3,7 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <groupId>com.example</groupId>
   <artifactId>ecom</artifactId>
   <version>0.0.1-SNAPSHOT</version>
@@ -12,6 +13,7 @@
   <properties>
     <java.version>17</java.version>
     <spring.boot.version>3.2.5</spring.boot.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
   <dependencyManagement>
@@ -27,6 +29,7 @@
   </dependencyManagement>
 
   <dependencies>
+    <!-- Web + Views -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -35,6 +38,8 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-thymeleaf</artifactId>
     </dependency>
+
+    <!-- Data -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -44,10 +49,14 @@
       <artifactId>mysql-connector-j</artifactId>
       <scope>runtime</scope>
     </dependency>
+
+    <!-- Monitoring -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
+
+    <!-- Tests -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
@@ -57,6 +66,17 @@
 
   <build>
     <plugins>
+      <!-- Ensure Java 17 compilation -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration>
+          <release>17</release>
+        </configuration>
+      </plugin>
+
+      <!-- Spring Boot repackage -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
@@ -66,6 +86,8 @@
           </image>
         </configuration>
       </plugin>
+
+      <!-- JaCoCo: enable XML report for SonarCloud -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -82,9 +104,19 @@
             <goals>
               <goal>report</goal>
             </goals>
+            <configuration>
+              <reports>
+                <xml>true</xml>
+                <csv>false</csv>
+                <html>true</html>
+              </reports>
+              <!-- Will generate: target/site/jacoco/jacoco.xml -->
+            </configuration>
           </execution>
         </executions>
       </plugin>
+
+      <!-- Surefire (JUnit 5) -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
