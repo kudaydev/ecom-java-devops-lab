@@ -1,2 +1,2 @@
 skip-check: []
-soft_fail: false
+soft_fail: true

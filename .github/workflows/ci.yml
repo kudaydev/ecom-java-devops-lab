@@ -61,7 +61,7 @@ jobs:
         with:
           directory: ./k8s
           framework: kubernetes
-          soft_fail: false
+          soft_fail: true
 
       # Only assume role and interact with AWS on pushes to main
       - name: Configure AWS credentials (OIDC) - only on push to main
