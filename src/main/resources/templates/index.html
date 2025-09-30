@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>Store - Home</title>
+  <link rel="stylesheet" th:href="@{/css/styles.css}" />
+</head>
+<body>
+  <h1>Products</h1>
+  <div class="grid">
+    <div th:each="p : ${products}" class="card">
+      <img th:src="${p.imageUrl}" alt="image" />
+      <h3 th:text="${p.name}">Name</h3>
+      <p th:text="${p.description}">Desc</p>
+      <p><b th:text="${#numbers.formatDecimal(p.price,1,2)}">$0.00</b></p>
+      <a th:href="@{|/product/${p.id}|}">View</a>
+    </div>
+  </div>
+  <a href="/cart">Cart</a> | <a href="/checkout">Checkout</a>
+</body>
+</html>

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecom-config
+  namespace: ecom
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
