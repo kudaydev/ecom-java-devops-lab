@@ -46,15 +46,15 @@ jobs:
           name: surefire-reports
           path: target/surefire-reports/**/*
 
-      - name: SonarCloud Scan (optional)
+      - name: SonarCloud (Maven)
         if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarcloud-github-action@v2
-        env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-          # Default token provided by GitHub – acceptable to pass as env for this action
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectBaseDir: .
+        run: |
+         mvn -B -ntp \
+         -Dsonar.projectKey=kudaydev_ecom-java-devops-lab \
+         -Dsonar.organization=kudaydev \
+         -Dsonar.host.url=https://sonarcloud.io \
+         -Dsonar.token=${{ env.SONAR_TOKEN }} \
+          sonar:sonar
 
       - name: Checkov scan (K8s manifests)
         uses: bridgecrewio/checkov-action@v12
