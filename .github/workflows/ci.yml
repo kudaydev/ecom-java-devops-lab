@@ -57,9 +57,9 @@ jobs:
           sonar:sonar
 
       - name: Checkov scan (K8s manifests)
-        uses: bridgecrewio/checkov-action@v12
+        uses: bridgecrewio/checkov-action@master
         with:
-          directory: k8s
+          directory: ./k8s
           framework: kubernetes
           soft_fail: false
 
