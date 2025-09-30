@@ -10,17 +10,21 @@ permissions:
   id-token: write   # for OIDC (push to main only)
   contents: read
 
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECR_REPO: ${{ secrets.ECR_REPO }}
-  DOCKER_IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}
-  IMAGE_TAG: ${{ github.sha }}
-
 jobs:
   build-test-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    # Bridge secrets into env so we can use them safely in `if:` expressions
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REPO: ${{ secrets.ECR_REPO }}
+      DOCKER_IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}
+      IMAGE_TAG: ${{ github.sha }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,10 +47,11 @@ jobs:
           path: target/surefire-reports/**/*
 
       - name: SonarCloud Scan (optional)
-        if: ${{ secrets.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarcloud-github-action@v2
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          # Default token provided by GitHub – acceptable to pass as env for this action
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectBaseDir: .
@@ -58,6 +63,7 @@ jobs:
           framework: kubernetes
           soft_fail: false
 
+      # Only assume role and interact with AWS on pushes to main
       - name: Configure AWS credentials (OIDC) - only on push to main
         if: ${{ github.event_name == 'push' }}
         uses: aws-actions/configure-aws-credentials@v4
@@ -91,10 +97,10 @@ jobs:
           docker push $DOCKER_IMAGE:latest
 
       - name: Slack notify (success)
-        if: success() && secrets.SLACK_WEBHOOK_URL != ''
+        if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK: ${{ env.SLACK_WEBHOOK_URL }}
           SLACK_COLOR: good
           SLACK_MESSAGE: |
             ✅ CI passed for ${{ github.repository }}@${{ github.sha }}
@@ -105,12 +111,14 @@ jobs:
     needs: [build-test-scan]
     runs-on: ubuntu-latest
     if: failure()
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Slack notify (failure)
-        if: secrets.SLACK_WEBHOOK_URL != ''
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK: ${{ env.SLACK_WEBHOOK_URL }}
           SLACK_COLOR: danger
           SLACK_MESSAGE: |
             ❌ CI failed for ${{ github.repository }}@${{ github.sha }}
